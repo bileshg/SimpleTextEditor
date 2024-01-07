@@ -45,6 +45,8 @@ class App(tk.Tk):
         self.edit_menu.add_command(label='Cut', command=self.cut)
         self.edit_menu.add_command(label='Copy', command=self.copy)
         self.edit_menu.add_command(label='Paste', command=self.paste)
+        self.edit_menu.add_separator()
+        self.edit_menu.add_command(label='Font', command=self.select_font)
         self.menubar.add_cascade(label="Edit", menu=self.edit_menu)
 
         # View Menu
@@ -53,9 +55,19 @@ class App(tk.Tk):
         self.view_menu.add_command(label='Zoom Out', command=self.zoom_out)
         self.menubar.add_cascade(label="View", menu=self.view_menu)
 
+        self.txt_editor.edit_modified(False)
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     def open_file(self):
+        if not self.txt_editor.edit_modified():
+            self._open_file_helper()
+        elif messagebox.askokcancel(
+            "Open",
+            "You have unsaved changes.\nDo you still want to open a new file?"
+        ):
+            self._open_file_helper()
+
+    def _open_file_helper(self):
         filepath = askopenfilename(
             filetypes=[('Text Files', '*.txt'), ('All Files', '*.*')]
         )
@@ -119,6 +131,63 @@ class App(tk.Tk):
         position = self.txt_editor.index(tk.INSERT)
         self.txt_editor.insert(position, content)
 
+    def select_font(self):
+        # Font Window
+        font_window = tk.Toplevel()
+        font_window.title('Select Font')
+        font_window.geometry(f'240x120+{self.winfo_x() + 50}+{self.winfo_y() + 50}')
+        font_window.minsize(240, 120)
+        font_window.focus_force()
+
+        # configure the grid
+        font_window.columnconfigure(0, weight=1)
+        font_window.columnconfigure(1, weight=3)
+
+        # font family
+        App._set_field_label(font_window, 'Font Family', 0)
+
+        selected_font_family = tk.StringVar()
+        selected_font_family.set(self.font_family)
+        font_families = sorted(tk_font.families())
+
+        dd_font_family = tk.OptionMenu(font_window, selected_font_family, *font_families)
+        dd_font_family.config(width=20)
+        dd_font_family.grid(column=1, row=0, sticky=tk.E, padx=5, pady=5)
+
+        # font size
+        App._set_field_label(font_window, 'Font Size', 1)
+
+        selected_font_size = tk.StringVar()
+        selected_font_size.set(str(self.font_size))
+
+        dd_font_size = tk.OptionMenu(font_window, selected_font_size, *range(8, 37))
+        dd_font_size.config(width=20)
+        dd_font_size.grid(column=1, row=1, sticky=tk.E, padx=5, pady=5)
+
+        # OK Button
+        ok_button = tk.Button(
+            font_window,
+            width=10,
+            text='OK',
+            command=lambda: self._set_font(
+                font_window,
+                dd_font_family.cget('text'),
+                dd_font_size.cget('text')
+            )
+        )
+        ok_button.grid(column=0, row=3, columnspan=2, sticky=tk.E, padx=5, pady=5)
+
+    @staticmethod
+    def _set_field_label(window, field_name, row):
+        lbl = tk.Label(window, text=field_name)
+        lbl.grid(column=0, row=row, sticky=tk.W, padx=5, pady=5)
+
+    def _set_font(self, font_window, font_family, font_size):
+        self.font_family = font_family
+        self.font_size = int(font_size)
+        self.txt_editor.configure(font=tk_font.Font(family=self.font_family, size=self.font_size))
+        font_window.destroy()
+
     def zoom_in(self):
         if self.font_size < 36:
             self.font_size += 1
@@ -130,8 +199,7 @@ class App(tk.Tk):
             self.txt_editor.configure(font=tk_font.Font(family=self.font_family, size=self.font_size))
 
     def on_closing(self):
-        print(self.txt_editor.edit_modified())
-        if self.filepath is not None and not self.txt_editor.edit_modified():
+        if not self.txt_editor.edit_modified():
             self.destroy()
         elif messagebox.askokcancel(
             "Quit",
